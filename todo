@@ -1,0 +1,79 @@
+# Neighbor Discovery Service - TODO List
+
+## 📁 Project Setup
+- [x] Set up folder structure
+- [x] Create Makefile
+- [x] service.cpp, service.h
+- [x] cli.cpp
+- [x] common.h (for shared constants, structs, etc.)
+- [x] Write Makefile for building both binaries (service, cli)
+
+## ⚙️ Service Program
+
+### 🧠 Initialization
+- [x] Get all network interfaces (excluding loopback)
+- [x] Get each interface's IP address and subnet
+- [x] Bind sockets for each subnet/interface (UDP broadcast or multicast)
+- [ ] Set up UNIX domain socket (or localhost TCP) for CLI communication
+
+### 📡 Peer Discovery
+- [ ] Periodically (e.g. every 5 seconds) broadcast "hello" messages on all interfaces
+- [ ] Listen for replies from other services
+- [ ] Parse messages to identify neighbors
+- [ ] Match replies by subnet to confirm they are neighbors
+
+### 🕒 Neighbor Tracking
+- [ ] Store a list of active neighbors (IP + MAC + last_seen timestamp)
+- [ ] Expire any neighbors not seen in the last 30 seconds
+
+### 📞 CLI Communication
+- [ ] Accept connections from CLI tool
+- [ ] On request, return list of current neighbors in plain text:
+  - Format: `IP MAC\n` per neighbor
+  - Use non-blocking I/O or select() (no threads allowed)
+
+## 🖥️ CLI Program
+- [ ] Connect to local service (UNIX or TCP socket)
+- [ ] Send command: e.g., "LIST\n"
+- [ ] Receive neighbor list
+- [ ] Print formatted output to terminal:
+  ```
+  Active Neighbors:
+  -----------------
+  IP Address        MAC Address
+  192.168.1.10      aa:bb:cc:dd:ee:ff
+  ...
+  ```
+
+## 💡 Protocol Design (Internal)
+- [ ] Define a simple message protocol for discovery:
+  - Example hello packet: `"HELLO <IP> <MAC>"`
+  - Reply packet: `"REPLY <IP> <MAC>"`
+- [ ] Define CLI-to-service protocol:
+  - CLI sends: `"LIST\n"`
+  - Service replies with lines: `<IP> <MAC>\n`
+
+## 🧪 Testing & Debugging
+
+### Local Testing
+- [ ] Create 3+ VMs in virt-manager with shared virtual network
+- [ ] One VM should have 2 network interfaces
+- [ ] Run service on all VMs
+- [ ] Use CLI tool to verify that neighbors are detected and listed correctly
+
+### Edge Cases
+- [ ] Changing IP address while service is running
+- [ ] Device connecting/disconnecting from network
+- [ ] Service restarting
+
+## 🧼 Finishing Touches
+- [ ] Add usage instructions (e.g., --help for CLI)
+- [ ] Add debug/logging output (optional, maybe controllable via flag)
+- [ ] Ensure compliance:
+  - [ ] No threads
+  - [ ] No exceptions
+  - [ ] No system programs/tools
+  - [ ] g++, stdc++ only
+
+## 📋 Current Status
+**Next Priority**: Implement UDP discovery protocol for broadcasting and listening

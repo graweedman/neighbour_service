@@ -3,6 +3,7 @@
 #include <netinet/in.h>
 #include <net/if.h> 
 #include <arpa/inet.h>
+#include <sys/un.h>
 #include <iostream>
 #include <vector>
 #include <fcntl.h>
@@ -13,6 +14,8 @@
 using namespace std;
 
 const int DISCOVERY_PORT = 50000;
+const char* CLI_SOCKET_PATH = "/tmp/graw_service.sock";
+int cli_socket_fd = -1;
 
 struct BoundSocket {
     int socket_fd;
@@ -129,7 +132,57 @@ int bind_all_interfaces() {
     return 0;
 }
 
+int setup_cli_socket() {
+    unlink(CLI_SOCKET_PATH); 
 
+    cli_socket_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (cli_socket_fd < 0) {
+        perror("CLI socket creation failed");
+        return -1;
+    }
+
+    int flags = fcntl(cli_socket_fd, F_GETFL, 0);
+    if (flags == -1) {
+        perror("fcntl F_GETFL failed");
+        close(cli_socket_fd);
+        return -1;
+    }
+
+    if (fcntl(cli_socket_fd, F_SETFL, flags | O_NONBLOCK) == -1) {
+        perror("fcntl F_SETFL failed");
+        close(cli_socket_fd);
+        return -1;
+    }
+
+    struct sockaddr_un addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sun_family = AF_UNIX;
+    strncpy(addr.sun_path, CLI_SOCKET_PATH, sizeof(addr.sun_path) - 1);
+
+    if(bind(cli_socket_fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
+        perror("CLI socket bind failed");
+        close(cli_socket_fd);
+        return -1;
+    }
+
+    if (listen(cli_socket_fd, 5) < 0) {
+        perror("CLI socket listen failed");
+        close(cli_socket_fd);
+        return -1;
+    }
+
+    cout << "CLI socket created and listening at: " << CLI_SOCKET_PATH << endl;
+    return 0;
+}
+
+void cleanup_cli_socket() {
+    if (cli_socket_fd >= 0) {
+        close(cli_socket_fd);
+        unlink(CLI_SOCKET_PATH);
+        cli_socket_fd = -1;
+        cout << "CLI socket cleaned up." << endl;
+    }
+}
 
 int load_network_interfaces() {
     network_interfaces = get_network_interfaces();
