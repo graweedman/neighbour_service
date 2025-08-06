@@ -48,6 +48,17 @@ vector<NetworkInterface> get_network_interfaces() {
     return interfaces;
 }
 
+void cleanup_sockets() {
+    for (auto& bound_sock : bound_sockets) {
+        if (bound_sock.is_bound && bound_sock.socket_fd >= 0) {
+            close(bound_sock.socket_fd);
+            cout << "Closed socket for interface: " << bound_sock.interface_ptr->name << endl;
+        }
+    }
+    bound_sockets.clear();
+    cout << "All sockets cleaned up." << endl;
+}
+
 int bind_to_interface(const NetworkInterface& interface) {
     int sock = socket(AF_INET, SOCK_DGRAM, 0);
     if (sock < 0) {
@@ -94,9 +105,9 @@ int bind_to_interface(const NetworkInterface& interface) {
 }
 
 int bind_all_interfaces() {
-    vector<NetworkInterface> interfaces = get_network_interfaces();
+    cleanup_sockets();
 
-    for (const auto& interface : interfaces) {
+    for (const auto& interface : network_interfaces) {
         if (!interface.is_active) {
             cout << "Skipping inactive interface: " << interface.name << endl;
             continue;
@@ -115,18 +126,10 @@ int bind_all_interfaces() {
 
         bound_sockets.push_back(bound_sock);
     }
+    return 0;
 }
 
-void cleanup_sockets() {
-    for (auto& bound_sock : bound_sockets) {
-        if (bound_sock.is_bound && bound_sock.socket_fd >= 0) {
-            close(bound_sock.socket_fd);
-            cout << "Closed socket for interface: " << bound_sock.interface_ptr->name << endl;
-        }
-    }
-    bound_sockets.clear();
-    cout << "All sockets cleaned up." << endl;
-}
+
 
 int load_network_interfaces() {
     network_interfaces = get_network_interfaces();
@@ -142,6 +145,26 @@ int load_network_interfaces() {
 }
 
 int main() {
+    cout << "Starting network discovery service..." << endl;
     load_network_interfaces();
+
+    cout << "Binding to all active interfaces..." << endl;
+    bind_all_interfaces();
+
+    if (bound_sockets.empty()) {
+        cout << "No active interfaces found to bind." << endl;
+        return 1;
+    } else {
+        cout << "Successfully bound to " << bound_sockets.size() << " active interfaces." << endl;
+        for (const auto& bound_sock : bound_sockets) {
+            cout << " - " << bound_sock.interface_ptr->name << " (" << bound_sock.interface_ptr->ip_address << ")" << endl;
+        }
+        cin.get();
+    }
+
+    cleanup_sockets();
+    cout << "Network discovery service finished." << endl;
+    cout << "Exiting..." << endl;
+
     return 0;
 }
