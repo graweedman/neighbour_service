@@ -27,13 +27,13 @@
 - [ ] Expire any neighbors not seen in the last 30 seconds
 
 ### 📞 CLI Communication
-- [ ] Accept connections from CLI tool
+- [x] Accept connections from CLI tool
 - [ ] On request, return list of current neighbors in plain text:
   - Format: `IP MAC\n` per neighbor
   - Use non-blocking I/O or select() (no threads allowed)
 
 ## 🖥️ CLI Program
-- [ ] Connect to local service (UNIX or TCP socket)
+- [x] Connect to local service (UNIX or TCP socket)
 - [ ] Send command: e.g., "LIST\n"
 - [ ] Receive neighbor list
 - [ ] Print formatted output to terminal:
