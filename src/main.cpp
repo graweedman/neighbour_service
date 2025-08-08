@@ -4,6 +4,7 @@
 #include <net/if.h> 
 #include <arpa/inet.h>
 #include <sys/un.h>
+#include <sys/select.h>
 #include <iostream>
 #include <vector>
 #include <fcntl.h>
@@ -14,6 +15,7 @@
 using namespace std;
 
 const int DISCOVERY_PORT = 50000;
+const char* PID_FILE = "/tmp/graw_service.pid";
 const char* CLI_SOCKET_PATH = "/tmp/graw_service.sock";
 int cli_socket_fd = -1;
 
@@ -23,8 +25,23 @@ struct BoundSocket {
     bool is_bound;
 };
 
+bool running = true;
+
 vector<NetworkInterface> network_interfaces;
 vector<BoundSocket> bound_sockets;
+
+
+void write_pid_file() {
+    FILE* pid_file = fopen(PID_FILE, "w");
+    if (pid_file) {
+        fprintf(pid_file, "%d\n", getpid());
+        fclose(pid_file);
+    }
+}
+
+void cleanup_pid_file() {
+    unlink(PID_FILE);
+}
 
 vector<NetworkInterface> get_network_interfaces() {
     vector<NetworkInterface> interfaces;
@@ -132,6 +149,25 @@ int bind_all_interfaces() {
     return 0;
 }
 
+void handle_discovery_packet(int socket_fd, const NetworkInterface& interface) {
+    char buffer[1024];
+    struct sockaddr_in sender_addr;
+    socklen_t addr_len = sizeof(sender_addr);
+
+    ssize_t bytes_received = recvfrom(socket_fd, buffer, sizeof(buffer) - 1, 0,
+                                      (struct sockaddr*)&sender_addr, &addr_len);
+    if (bytes_received < 0) {
+        perror("recvfrom failed");
+        return;
+    }
+
+    buffer[bytes_received] = '\0'; // Null-terminate the received data
+    cout << "Received packet from " << inet_ntoa(sender_addr.sin_addr) 
+         << " on interface " << interface.name << ": " << buffer << endl;
+
+    // Process the packet (e.g., respond to discovery requests)
+}
+
 int setup_cli_socket() {
     unlink(CLI_SOCKET_PATH); 
 
@@ -175,6 +211,37 @@ int setup_cli_socket() {
     return 0;
 }
 
+void handle_cli_connection() {
+    struct sockaddr_un cli_addr;
+    socklen_t cli_len = sizeof(cli_addr);
+
+    int client_fd = accept(cli_socket_fd, (struct sockaddr*)&cli_addr, &cli_len);
+    if (client_fd < 0) {
+        if (errno != EAGAIN && errno != EWOULDBLOCK) {
+            perror("CLI accept failed");
+        }
+        return;
+    }
+
+    cout << "CLI client connected" << endl;
+
+    char buffer[256];
+    ssize_t bytes_read = recv(client_fd, buffer, sizeof(buffer) - 1, 0);
+    if (bytes_read > 0) {
+        buffer[bytes_read] = '\0'; // Null-terminate the string
+        cout << "Received from CLI: " << buffer << endl;
+        string command(buffer);
+
+        if (command.find("HELLO") == 0) {
+            string response = "WORLD\n";
+            send(client_fd, response.c_str(), response.size(), 0);
+        }
+    }
+
+    close(client_fd);
+    cout << "CLI client disconnected" << endl;
+}
+
 void cleanup_cli_socket() {
     if (cli_socket_fd >= 0) {
         close(cli_socket_fd);
@@ -198,11 +265,22 @@ int load_network_interfaces() {
 }
 
 int main() {
+    write_pid_file();
     cout << "Starting network discovery service..." << endl;
-    load_network_interfaces();
+    if (load_network_interfaces() < 0) {
+        cerr << "Failed to load network interfaces." << endl;
+        return 1;
+    }
+    if (setup_cli_socket() < 0) {
+        cerr << "Failed to set up CLI socket." << endl;
+        return 1;
+    }
 
     cout << "Binding to all active interfaces..." << endl;
-    bind_all_interfaces();
+    if (bind_all_interfaces() < 0) {
+        cerr << "Failed to bind to all active interfaces." << endl;
+        return 1;
+    }
 
     if (bound_sockets.empty()) {
         cout << "No active interfaces found to bind." << endl;
@@ -212,10 +290,51 @@ int main() {
         for (const auto& bound_sock : bound_sockets) {
             cout << " - " << bound_sock.interface_ptr->name << " (" << bound_sock.interface_ptr->ip_address << ")" << endl;
         }
-        cin.get();
     }
 
+    while (running) {
+        fd_set read_fds;
+        FD_ZERO(&read_fds);
+        int max_fd = cli_socket_fd;
+
+        for (const auto& bound_sock : bound_sockets) {
+            if (bound_sock.is_bound) {
+                FD_SET(bound_sock.socket_fd, &read_fds);
+                if (bound_sock.socket_fd > max_fd) {
+                    max_fd = bound_sock.socket_fd;
+                }
+            }
+        }
+
+        FD_SET(cli_socket_fd, &read_fds);
+
+        struct timeval timeout;
+        timeout.tv_sec = 5; // Wait for 5 seconds
+        timeout.tv_usec = 0;
+
+        int activity = select(max_fd + 1, &read_fds, nullptr, nullptr, &timeout);
+        if (activity < 0) {
+            perror("select failed");
+            break;
+        } else if (activity == 0) {
+            cout << "No activity detected, continuing..." << endl;
+            continue;
+        }
+
+        if (FD_ISSET(cli_socket_fd, &read_fds)) {
+            handle_cli_connection();
+        }
+
+        for (auto& bound_sock : bound_sockets) {
+            if (FD_ISSET(bound_sock.socket_fd, &read_fds)) {
+                handle_discovery_packet(bound_sock.socket_fd, *bound_sock.interface_ptr);
+            }
+        }
+    }       
+
     cleanup_sockets();
+    cleanup_cli_socket();
+    cleanup_pid_file();
     cout << "Network discovery service finished." << endl;
     cout << "Exiting..." << endl;
 

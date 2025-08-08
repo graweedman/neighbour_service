@@ -14,7 +14,7 @@
 - [x] Get all network interfaces (excluding loopback)
 - [x] Get each interface's IP address and subnet
 - [x] Bind sockets for each subnet/interface (UDP broadcast or multicast)
-- [ ] Set up UNIX domain socket (or localhost TCP) for CLI communication
+- [x] Set up UNIX domain socket (or localhost TCP) for CLI communication
 
 ### 📡 Peer Discovery
 - [ ] Periodically (e.g. every 5 seconds) broadcast "hello" messages on all interfaces
