@@ -8,6 +8,8 @@
 #include <signal.h>
 #include <string>
 
+#include "service_connection.h"
+
 
 using namespace std;
 
@@ -15,6 +17,7 @@ const char* SERVICE_PID_PATH = "/tmp/graw_service.pid";
 const char* CLI_SOCKET_PATH = "/tmp/graw_service.sock";
 const char* SERVICE_BINARY = "./build/graw_service";
 
+ServiceConnection service_connection(CLI_SOCKET_PATH);
 
 pid_t service_pid = -1;
 
@@ -36,26 +39,8 @@ pid_t read_pid_file() {
     return -1;
 }
 
-bool socket_exists() {
-    struct stat buffer;
-    return (stat(CLI_SOCKET_PATH, &buffer) == 0);
-}
-
-bool can_connect_to_service() {
-    int sock_fd = socket(AF_UNIX, SOCK_STREAM, 0);
-    if (sock_fd < 0) {
-        perror("socket creation failed");
-        return false;
-    }
-
-    struct sockaddr_un server_addr;
-    memset(&server_addr, 0, sizeof(server_addr));
-    server_addr.sun_family = AF_UNIX;
-    strncpy(server_addr.sun_path, CLI_SOCKET_PATH, sizeof(server_addr.sun_path) - 1);
-
-    bool can_connect = (connect(sock_fd, (struct sockaddr*)&server_addr, sizeof(server_addr)) == 0);
-    close(sock_fd);
-    return can_connect;
+bool is_service_running() {
+    return (read_pid_file() > 0);
 }
 
 int start_service() {
@@ -75,7 +60,7 @@ int start_service() {
     sleep(2);
 
     for( int i = 0; i < 5; ++i) {
-        if (can_connect_to_service()) {
+        if (is_service_running()) {
             cout << "Service is ready." << endl;
             return 0;
         }
@@ -109,62 +94,8 @@ void stop_service() {
     }
 }
 
-int connect_to_service() {
-    if (!socket_exists() || !can_connect_to_service()) {
-        cout << "Service is not running, starting it..." << endl;
-        if (start_service() < 0) {
-            cerr << "Failed to start service." << endl;
-            return -1;
-        }
-    } else {
-        cout << "Service is already running." << endl;
-    }
 
-    int sock_fd = socket(AF_UNIX, SOCK_STREAM, 0);
-    if (sock_fd < 0) {
-        perror("socket creation failed");
-        return -1;
-    }
 
-    struct sockaddr_un server_addr;
-    memset(&server_addr, 0, sizeof(server_addr));
-    server_addr.sun_family = AF_UNIX;
-    strncpy(server_addr.sun_path, CLI_SOCKET_PATH, sizeof(server_addr.sun_path) - 1);
-
-    if (connect(sock_fd, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
-        perror("connect failed - is the service running?");
-        close(sock_fd);
-        return -1;
-    }
-
-    return sock_fd;
-    
-}
-
-ssize_t recv_with_timeout(int sock_fd, char* buffer, size_t buffer_size, int timeout_seconds) {
-    fd_set read_fds;
-    FD_ZERO(&read_fds);
-    FD_SET(sock_fd, &read_fds);
-    
-    struct timeval timeout;
-    timeout.tv_sec = timeout_seconds;
-    timeout.tv_usec = 0;
-    
-    int result = select(sock_fd + 1, &read_fds, nullptr, nullptr, &timeout);
-    if (result < 0) {
-        perror("select failed");
-        return -1;
-    } else if (result == 0) {
-        cout << "Timeout waiting for response" << endl;
-        return 0;  // Timeout
-    }
-    
-    return recv(sock_fd, buffer, buffer_size, 0);
-}
-
-bool is_service_running() {
-    return (read_pid_file() > 0) || can_connect_to_service();
-}
 
 int main() {
     cout << "Connecting to neighbor discovery service..." << endl;
@@ -179,7 +110,7 @@ int main() {
         }
 
         if (input == "start") {
-            if (is_service_running()) {
+            if (is_service_running() && service_connection.can_connect()) {
                 cout << "Service is already running" << endl;
             } else {
                 start_service();
@@ -188,6 +119,7 @@ int main() {
         }
 
         if (input == "stop") {
+            cout << "Stopping service..." << endl;
             stop_service();
             continue;
         }
@@ -198,38 +130,24 @@ int main() {
             } else {
                 cout << "Service is not running" << endl;
             }
+            if (service_connection.can_connect()) {
+                cout << "Can connect to service." << endl;
+            } else {
+                cout << "Can not connect to service." << endl;
+            }
             continue;
         }
 
-        // Regular commands - auto-start service if needed
-        int sock_fd = connect_to_service();
-        if (sock_fd < 0) {
-            cout << "Failed to connect to service" << endl;
+        if (input.empty()) {
             continue;
         }
-
-        // Send command
-        string command = input + "\n";
-        if (send(sock_fd, command.c_str(), command.length(), 0) < 0) {
-            perror("send failed");
-            close(sock_fd);
-            continue;
-        }
-
-        // Receive response
-        char buffer[1024];
-        ssize_t bytes_received = recv_with_timeout(sock_fd, buffer, sizeof(buffer) -1, 5);
-
-        if (bytes_received > 0) {
-            buffer[bytes_received] = '\0';
-            cout << "Response: " << buffer;
+        string response;
+        if (service_connection.send_and_receive(input, response)) {
+            cout << "Response: " << response << endl;
         } else {
-            cout << "No response from service" << endl;
+            cout << "Failed to send command or receive response." << endl;
         }
-
-        close(sock_fd);
     }
-
     stop_service();
     cout << "Disconnected from service." << endl;
 

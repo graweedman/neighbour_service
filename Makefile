@@ -24,10 +24,10 @@ $(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp
 $(BUILD_DIR)/common/%.o: $(SRC_DIR)/common/%.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-$(TARGET): $(BUILD_DIR)/main.o $(BUILD_DIR)/discovery.o $(COMMON_OBJS)
+$(TARGET): $(BUILD_DIR)/main.o $(BUILD_DIR)/neighbour_discovery.o $(BUILD_DIR)/service.o $(COMMON_OBJS)
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
-$(CLI_TARGET): $(BUILD_DIR)/cli.o $(COMMON_OBJS)
+$(CLI_TARGET): $(BUILD_DIR)/cli.o $(BUILD_DIR)/service_connection.o $(COMMON_OBJS)
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
 clean:

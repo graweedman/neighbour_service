@@ -6,28 +6,68 @@
 #include <netinet/in.h>
 #include <net/if.h> 
 #include <arpa/inet.h>
+#include <array>
+#include <algorithm>
+#include <time.h>
+#include <vector>
 
-#include "helper.h"
+typedef std::string MAC_Address; 
+typedef std::string IP_Address;
+
+#include "node_id.h"
+
 
 struct NetworkInterface {
     std::string name;
-    std::string ip_address;
-    std::string mac_address;
-    std::string netmask;
-    std::string subnet_mask;
+    IP_Address ip_address;
+    MAC_Address mac_address;
+    IP_Address subnet_mask;
+    std::string network_cidr;
     bool is_ipv4;
     bool is_active;
 
     static NetworkInterface from_ifaddrs(struct ifaddrs* ifa);
 };
 
-struct NetworkNeighbor {
-    std::string ip_address;
-    std::string mac_address;
-    std::string interface_name;
-    int last_seen;
-    bool is_active;
-    bool is_ipv4;
+struct NetworkConnection {
+    IP_Address ip;
+    MAC_Address mac_address;
 };
+
+struct NetworkNeighbor {
+    std::vector<std::string> interface_names; // Store interface names
+    std::vector<NetworkConnection> connections;
+    int last_seen;
+
+    void update_last_seen();
+    bool is_active() const;
+    void add_interface(const NetworkInterface& interface);
+    void add_connection(const NetworkConnection& connection);
+};
+
+struct BoundSocket {
+    int socket_fd;
+    size_t interface_index;
+    sockaddr_in broadcast_addr;
+    bool is_bound;
+
+    const NetworkInterface* get_interface(const std::vector<NetworkInterface>& interfaces) const {
+        return (interface_index < interfaces.size()) ? &interfaces[interface_index] : nullptr;
+    }
+};
+
+struct DiscoveryPackage {
+    std::string hello_message;
+    NodeIDHex sender_id;
+    IP_Address sender_ip;
+    MAC_Address sender_mac;
+
+    static DiscoveryPackage from_string(std::string& data);
+
+private:
+    static std::string extract_field(const std::string& message, const std::string& field_name);
+};
+
+
 
 #endif // COMMON_TYPES_H

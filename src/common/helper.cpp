@@ -13,7 +13,7 @@ namespace helper {
         return cidr;
     }
 
-    std::string subnet_mask(const std::string& ip, int cidr) {
+    std::string network_cidr(const std::string& ip, int cidr) {
         struct in_addr address;
         inet_aton(ip.c_str(), &address);
         
@@ -26,7 +26,26 @@ namespace helper {
         return std::string(inet_ntoa(network_address)) + "/" + std::to_string(cidr);
     }
 
-    std::string get_mac_address(const std::string& interface_name) {
+    IP_Address broadcast_address(const std::string& network_cidr) {
+        size_t pos = network_cidr.find('/');
+        if (pos == std::string::npos) return "";
+
+        std::string ip_part = network_cidr.substr(0, pos);
+        int cidr = std::stoi(network_cidr.substr(pos + 1));
+
+        struct in_addr address;
+        inet_aton(ip_part.c_str(), &address);
+
+        uint32_t mask = (0xFFFFFFFF << (32 - cidr)) & 0xFFFFFFFF;
+        uint32_t broadcast = ntohl(address.s_addr) | ~mask;
+
+        struct in_addr broadcast_address;
+        broadcast_address.s_addr = htonl(broadcast);
+
+        return IP_Address(inet_ntoa(broadcast_address));
+    }
+
+    MAC_Address get_mac_address(const std::string& interface_name) {
         int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
 
         struct ifreq ifr;
