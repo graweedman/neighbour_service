@@ -60,3 +60,18 @@ namespace helper {
     }
 } // namespace helper
 
+bool helper::is_ip_in_network(const std::string &ip, const std::string &network_cidr)
+{
+    size_t pos = network_cidr.find('/');
+    if (pos == std::string::npos) return false;
+
+    std::string network_ip = network_cidr.substr(0, pos);
+    int cidr = std::stoi(network_cidr.substr(pos + 1));
+
+    struct in_addr ip_addr, network_addr;
+    inet_aton(ip.c_str(), &ip_addr);
+    inet_aton(network_ip.c_str(), &network_addr);
+
+    uint32_t mask = (0xFFFFFFFF << (32 - cidr)) & 0xFFFFFFFF;
+    return (ntohl(ip_addr.s_addr) & mask) == (ntohl(network_addr.s_addr) & mask);
+}

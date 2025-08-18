@@ -26,6 +26,9 @@ int Service::init() {
     if (!neighbour_discovery) {
         std::cerr << "Failed to create NeighbourDiscovery instance." << std::endl;
         return -1;
+    } else {
+        std::cout << "NeighbourDiscovery initialized with discovery port: " << discovery_port << std::endl;
+        neighbour_discovery->broadcast_hello();
     }
 
     return 0;
@@ -51,6 +54,13 @@ int Service::update_network_interfaces()
         if (interface.ip_address.empty()) {
             continue; // Skip interfaces without an IP address
         }
+        std::cout << "Interface: " << interface.name 
+                  << ", IP: " << interface.ip_address 
+                  << ", MAC: " << interface.mac_address 
+                  << ", Subnet Mask: " << interface.subnet_mask 
+                  << ", Network CIDR: " << interface.network_cidr 
+                  << ", Broadcast Address: " << interface.broadcast_address 
+                  << std::endl;
         interfaces.push_back(interface);
     }
     freeifaddrs(ifaddr);
@@ -188,42 +198,47 @@ int Service::start()
 
 int Service::loop()
 {
-    fd_set read_fds;
-    FD_ZERO(&read_fds);
-    int max_fd = 0;
+    running = true;
 
-    if (cli_socket_fd >= 0) {
-        FD_SET(cli_socket_fd, &read_fds);
-        max_fd = cli_socket_fd;
-    }
+    while (running) {
+        fd_set read_fds;
+        FD_ZERO(&read_fds);
+        int max_fd = 0;
 
-    if (neighbour_discovery) {
-        const auto& discovery_sockets = neighbour_discovery->get_bound_sockets();
-        for (const auto& bound_sock : discovery_sockets) {
-            if (bound_sock.is_bound) {
-                FD_SET(bound_sock.socket_fd, &read_fds);
-                max_fd = std::max(max_fd, bound_sock.socket_fd);
-            }
+        if (cli_socket_fd >= 0) {
+            FD_SET(cli_socket_fd, &read_fds);
+            max_fd = cli_socket_fd;
         }
-    }
-    
-    struct timeval timeout;
-    timeout.tv_sec = 5; // Wait for 5 seconds
-    timeout.tv_usec = 0;
 
-    int activity = select(max_fd + 1, &read_fds, nullptr, nullptr, &timeout);
+        if (neighbour_discovery) {
+            FD_SET(neighbour_discovery->get_socket_fd(), &read_fds);
+            max_fd = std::max(max_fd, neighbour_discovery->get_socket_fd());
+        }
+        
+        struct timeval timeout;
+        timeout.tv_sec = 5; // Wait for 5 seconds
+        timeout.tv_usec = 0;
 
-    if (activity < 0) {
-        perror("select failed");
-        return -1;
-    }
+        int activity = select(max_fd + 1, &read_fds, nullptr, nullptr, &timeout);
 
-    if (FD_ISSET(cli_socket_fd, &read_fds)) {
-        handle_cli_connection();
-    }
+        if (activity < 0) {
+            perror("select failed");
+            return -1;
+        }
 
-    if (neighbour_discovery) {
-        neighbour_discovery->handle_activity(read_fds);
+        if (activity > 0 && cli_socket_fd >= 0 && FD_ISSET(cli_socket_fd, &read_fds))
+        {
+            handle_cli_connection();
+        }
+
+        if (neighbour_discovery) {
+            neighbour_discovery->handle_activity(read_fds);
+            
+        }
+
+        if (neighbour_discovery) {
+            neighbour_discovery->update();
+        }
     }
 
     return 0;

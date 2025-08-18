@@ -15,7 +15,7 @@ using namespace std;
 
 const char* SERVICE_PID_PATH = "/tmp/graw_service.pid";
 const char* CLI_SOCKET_PATH = "/tmp/graw_service.sock";
-const char* SERVICE_BINARY = "./build/graw_service";
+const char* SERVICE_BINARY = "./graw_service";
 
 ServiceConnection service_connection(CLI_SOCKET_PATH);
 
@@ -51,7 +51,7 @@ int start_service() {
         perror("fork failed");
         return -1;
     } else if (pid == 0) {
-        execl("./build/graw_service", "graw_service", nullptr);
+        execl(SERVICE_BINARY, "graw_service", nullptr);
         perror("execl failed");
         exit(EXIT_FAILURE);
     }

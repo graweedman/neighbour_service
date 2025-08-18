@@ -23,6 +23,7 @@ struct NetworkInterface {
     MAC_Address mac_address;
     IP_Address subnet_mask;
     std::string network_cidr;
+    IP_Address broadcast_address;
     bool is_ipv4;
     bool is_active;
 

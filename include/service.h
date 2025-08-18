@@ -21,6 +21,7 @@ class Service {
     const char* cli_socket_path;
     int cli_socket_fd;
     int discovery_port;
+    bool running = false;
 
     std::unique_ptr<NeighbourDiscovery> neighbour_discovery;
     std::vector<NetworkInterface> interfaces;

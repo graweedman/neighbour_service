@@ -9,6 +9,7 @@
 #include <sys/un.h>
 #include <iostream>
 #include <unistd.h>
+#include <chrono>
 
 #include "common/types.h"
 #include "common/helper.h"
@@ -19,9 +20,9 @@ class NeighbourDiscovery {
     int discovery_port;
     const std::vector<NetworkInterface>& interfaces;
     std::unordered_map<NodeIDHex, NetworkNeighbor> neighbors;
-    std::vector<BoundSocket> bound_sockets;
+    int socket_fd = -1;
 
-    void handle_discovery_packet(int socket_fd, const NetworkInterface& interface);
+    void handle_discovery_packet(int socket_fd);
 
     int bind_to_interface(const NetworkInterface& interface);
     int bind_all_interfaces();
@@ -37,9 +38,9 @@ public:
     void update();
     void cleanup_inactive_neighbors();
     void broadcast_hello();
-    void listen_for_hello(std::string& hello_message, const NetworkInterface& interface);
+    void listen_for_hello(std::string& hello_message, IP_Address sender_ip, const NetworkInterface& interface);
     const std::unordered_map<NodeIDHex, NetworkNeighbor>& get_neighbours() const;
-    const std::vector<BoundSocket>& get_bound_sockets() const;
+    int get_socket_fd() const { return socket_fd; }
 };
 
 #endif // DISCOVERY_H

@@ -15,13 +15,14 @@ NetworkInterface NetworkInterface::from_ifaddrs(struct ifaddrs* ifa) {
     struct sockaddr_in* addr_in = (struct sockaddr_in*)ifa->ifa_addr;
     interface.ip_address = inet_ntoa(addr_in->sin_addr);
     interface.mac_address = helper::get_mac_address(interface.name);
-
+    
     if (ifa->ifa_netmask) {
         struct sockaddr_in* netmask_in = (struct sockaddr_in*)ifa->ifa_netmask;
         interface.subnet_mask = inet_ntoa(netmask_in->sin_addr);
         int cidr = helper::netmask_to_cidr(netmask_in);
         interface.network_cidr = helper::network_cidr(interface.ip_address, cidr);
     }
+    interface.broadcast_address = helper::broadcast_address(interface.network_cidr);
 
     return interface;
 }

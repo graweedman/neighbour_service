@@ -85,10 +85,7 @@ int main() {
         cerr << "Failed to start service." << endl;
         return -1;
     }
-
-    while (running) {
-        service.loop();
-    }
+    service.loop();
 
     service.stop();
     cleanup_pid_file();
