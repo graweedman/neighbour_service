@@ -1,4 +1,5 @@
 #include "common/node_id.h"
+#include <iostream>
 
 static const char* kNodeIdDir  = ".local/share/neighsvc";
 static const char* kNodeIdFile = ".local/share/neighsvc/node_id";
@@ -26,25 +27,42 @@ static void set_uuid_v4_bits(uint8_t* b16) {
 }
 
 static bool gen_random_16(uint8_t* out) {
-    ssize_t r = getrandom(out, 16, 0);
+    memset(out, 0, 16);
+
+    ssize_t r = getrandom(out, 16, GRND_NONBLOCK);
     if (r == 16) return true;
+
+    memset(out, 0, 16);
+
     int fd = open("/dev/urandom", O_RDONLY);
     if (fd < 0) return false;
+
     ssize_t rr = read(fd, out, 16);
     close(fd);
+
     return rr == 16;
 }
 
 static bool ensure_dir(const char* dirpath) {
     struct stat st{};
     if (stat(dirpath, &st) == 0) return S_ISDIR(st.st_mode);
-    return mkdir(dirpath, 0700) == 0;
+    std::string path_str(dirpath);
+    size_t pos = 0;
+    while ((pos = path_str.find('/', pos + 1)) != std::string::npos) {
+        std::string subdir = path_str.substr(0, pos);
+        if (mkdir(subdir.c_str(), 0700) != 0 && errno != EEXIST) {
+            return false;
+        }
+    }
+
+    return !(mkdir(dirpath, 0700) != 0 && errno != EEXIST);
 }
 
 NodeID generate_node_id()
 {
     NodeID id{};
     const char* home = getenv("HOME");
+    std::cout << "Home directory: " << (home ? home : "not found") << std::endl;
     if (!home) return id;
 
     char dirpath[1024];
@@ -57,7 +75,10 @@ NodeID generate_node_id()
     if (!ensure_dir(dirpath)) return id;
 
     uint8_t tmp[16];
-    if (!gen_random_16(tmp)) return id;
+    if (!gen_random_16(tmp)) {
+        std::cout << "Failed to generate random UUID" << std::endl;
+        return id;
+    }
     set_uuid_v4_bits(tmp);
 
     if (!write_file(filepath, tmp, 16)) return id;
