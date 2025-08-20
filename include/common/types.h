@@ -16,7 +16,6 @@ typedef std::string IP_Address;
 
 #include "node_id.h"
 
-
 struct NetworkInterface {
     std::string name;
     IP_Address ip_address;
@@ -36,7 +35,7 @@ struct NetworkConnection {
 };
 
 struct NetworkNeighbor {
-    std::vector<std::string> interface_names; // Store interface names
+    std::vector<std::string> interface_names;
     std::vector<NetworkConnection> connections;
     int last_seen;
 
@@ -44,17 +43,6 @@ struct NetworkNeighbor {
     bool is_active() const;
     void add_interface(const NetworkInterface& interface);
     void add_connection(const NetworkConnection& connection);
-};
-
-struct BoundSocket {
-    int socket_fd;
-    size_t interface_index;
-    sockaddr_in broadcast_addr;
-    bool is_bound;
-
-    const NetworkInterface* get_interface(const std::vector<NetworkInterface>& interfaces) const {
-        return (interface_index < interfaces.size()) ? &interfaces[interface_index] : nullptr;
-    }
 };
 
 struct DiscoveryPackage {
@@ -68,7 +56,5 @@ struct DiscoveryPackage {
 private:
     static std::string extract_field(const std::string& message, const std::string& field_name);
 };
-
-
 
 #endif // COMMON_TYPES_H

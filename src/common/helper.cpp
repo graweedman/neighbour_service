@@ -58,20 +58,32 @@ namespace helper {
 
         return std::string(mac);
     }
-} // namespace helper
 
-bool helper::is_ip_in_network(const std::string &ip, const std::string &network_cidr)
-{
-    size_t pos = network_cidr.find('/');
-    if (pos == std::string::npos) return false;
+    bool is_ip_in_network(const std::string &ip, const std::string &network_cidr)
+    {
+        size_t pos = network_cidr.find('/');
+        if (pos == std::string::npos) return false;
 
-    std::string network_ip = network_cidr.substr(0, pos);
-    int cidr = std::stoi(network_cidr.substr(pos + 1));
+        std::string network_ip = network_cidr.substr(0, pos);
+        int cidr = std::stoi(network_cidr.substr(pos + 1));
 
-    struct in_addr ip_addr, network_addr;
-    inet_aton(ip.c_str(), &ip_addr);
-    inet_aton(network_ip.c_str(), &network_addr);
+        struct in_addr ip_addr, network_addr;
+        inet_aton(ip.c_str(), &ip_addr);
+        inet_aton(network_ip.c_str(), &network_addr);
 
-    uint32_t mask = (0xFFFFFFFF << (32 - cidr)) & 0xFFFFFFFF;
-    return (ntohl(ip_addr.s_addr) & mask) == (ntohl(network_addr.s_addr) & mask);
+        uint32_t mask = (0xFFFFFFFF << (32 - cidr)) & 0xFFFFFFFF;
+        return (ntohl(ip_addr.s_addr) & mask) == (ntohl(network_addr.s_addr) & mask);
+    }
+
+    void log_error(const std::string& message, bool quiet_mode) {
+        if (!quiet_mode) {
+            std::cerr << "Error: " << message << std::endl;
+        }
+    }
+    
+    void log_info(const std::string& message, bool quiet_mode) {
+        if (!quiet_mode) {
+            std::cout << "Info: " << message << std::endl;
+        }
+    }
 }

@@ -21,19 +21,19 @@ class NeighbourDiscovery {
     const std::vector<NetworkInterface>& interfaces;
     std::unordered_map<NodeIDHex, NetworkNeighbor> neighbors;
     int socket_fd = -1;
+    bool quiet_mode;
 
     void handle_discovery_packet(int socket_fd);
-
     int bind_to_interface(const NetworkInterface& interface);
     int bind_all_interfaces();
     void cleanup_bound_sockets();
-
     bool neighbor_exists(const NodeIDHex& id) const;
     NetworkNeighbor* get_neighbor(const NodeIDHex& id);
     void add_or_update_neighbor(const NodeIDHex& id, const NetworkInterface& interface, const NetworkConnection& connection);
 public:
-    NeighbourDiscovery(const std::vector<NetworkInterface>& interfaces, int discovery_port, NodeID node_id);
+    NeighbourDiscovery(const std::vector<NetworkInterface>& interfaces, int discovery_port, NodeID node_id, bool quiet_mode);
     ~NeighbourDiscovery();
+
     void handle_activity(const fd_set& read_fds);
     void update();
     void cleanup_inactive_neighbors();

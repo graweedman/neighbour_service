@@ -64,7 +64,6 @@ DiscoveryPackage DiscoveryPackage::from_string(std::string& data) {
         size_t name_start = from_pos + 6; // Skip " from "
         size_t name_end = data.find(" ", name_start);
         if (name_end != std::string::npos) {
-            // Interface name is between "from " and next space
             std::string interface_name = data.substr(name_start, name_end - name_start);
         }
     }

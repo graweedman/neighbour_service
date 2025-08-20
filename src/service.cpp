@@ -1,7 +1,7 @@
 #include "service.h"
 
-Service::Service(const char* cli_socket_path, int discovery_port)
-    : cli_socket_path(cli_socket_path), cli_socket_fd(-1), discovery_port(discovery_port) 
+Service::Service(const char* cli_socket_path, int discovery_port, bool quiet_mode)
+    : cli_socket_path(cli_socket_path), cli_socket_fd(-1), discovery_port(discovery_port), quiet_mode(quiet_mode)
 {
     node_id = generate_node_id();
 }
@@ -14,20 +14,20 @@ Service::~Service() {
 
 int Service::init() {
     if (init_interfaces() < 0) {
-        std::cerr << "Failed to initialize network interfaces." << std::endl;
+        helper::log_error("Failed to initialize network interfaces.", quiet_mode);
         return -1;
     }
     if (init_cli_socket() < 0) {
-        std::cerr << "Failed to initialize CLI socket." << std::endl;
+        helper::log_error("Failed to initialize CLI socket.", quiet_mode);
         return -1;
     }
 
-    neighbour_discovery = std::make_unique<NeighbourDiscovery>(interfaces, discovery_port, node_id);
+    neighbour_discovery = std::make_unique<NeighbourDiscovery>(interfaces, discovery_port, node_id, quiet_mode);
     if (!neighbour_discovery) {
-        std::cerr << "Failed to create NeighbourDiscovery instance." << std::endl;
+        helper::log_error("Failed to create NeighbourDiscovery instance.", quiet_mode);
         return -1;
     } else {
-        std::cout << "NeighbourDiscovery initialized with discovery port: " << discovery_port << std::endl;
+        helper::log_info("NeighbourDiscovery initialized with discovery port: " + std::to_string(discovery_port), quiet_mode);
         neighbour_discovery->broadcast_hello();
     }
 
@@ -40,7 +40,7 @@ int Service::update_network_interfaces()
     struct ifaddrs *ifaddr, *ifa;
 
     if (getifaddrs(&ifaddr) == -1) {
-        std::cerr << "getifaddrs failed" << std::endl;
+        helper::log_error("getifaddrs failed", quiet_mode);
         return -1;
     }
 
@@ -70,11 +70,11 @@ int Service::update_network_interfaces()
 int Service::init_interfaces()
 {
     if (update_network_interfaces() < 0) {
-        std::cerr << "Failed to update network interfaces." << std::endl;
+        helper::log_error("Failed to update network interfaces.", quiet_mode);
         return -1;
     }
     if (interfaces.empty()) {
-        std::cerr << "No active network interfaces found." << std::endl;
+        helper::log_error("No active network interfaces found.", quiet_mode);
         return -1;
     }
     return 0;
@@ -86,19 +86,19 @@ int Service::init_cli_socket()
 
     cli_socket_fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (cli_socket_fd < 0) {
-        std::cerr << "CLI socket creation failed" << std::endl;
+        helper::log_error("CLI socket creation failed", quiet_mode);
         return -1;
     }
 
     int flags = fcntl(cli_socket_fd, F_GETFL, 0);
     if (flags == -1) {
-        std::cerr << "fcntl F_GETFL failed" << std::endl;
+        helper::log_error("fcntl F_GETFL failed", quiet_mode);
         close(cli_socket_fd);
         return -1;
     }
 
     if (fcntl(cli_socket_fd, F_SETFL, flags | O_NONBLOCK) == -1) {
-        std::cerr << "fcntl F_SETFL failed" << std::endl;
+        helper::log_error("fcntl F_SETFL failed", quiet_mode);
         close(cli_socket_fd);
         return -1;
     }
@@ -109,18 +109,18 @@ int Service::init_cli_socket()
     strncpy(addr.sun_path, cli_socket_path, sizeof(addr.sun_path) - 1);
 
     if(bind(cli_socket_fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
-        std::cerr << "CLI socket bind failed" << std::endl;
+        helper::log_error("CLI socket bind failed", quiet_mode);
         close(cli_socket_fd);
         return -1;
     }
 
     if (listen(cli_socket_fd, 5) < 0) {
-        std::cerr << "CLI socket listen failed" << std::endl;
+        helper::log_error("CLI socket listen failed", quiet_mode);
         close(cli_socket_fd);
         return -1;
     }
 
-    std::cout << "CLI socket created and listening at: " << cli_socket_path << std::endl;
+    helper::log_info("CLI socket created and listening at: " + std::string(cli_socket_path), quiet_mode);
     return 0;
 }
 
@@ -129,7 +129,7 @@ void Service::cleanup_cli_socket() {
         close(cli_socket_fd);
         unlink(cli_socket_path);
         cli_socket_fd = -1;
-        std::cout << "CLI socket cleaned up." << std::endl;
+        helper::log_info("CLI socket cleaned up.", quiet_mode);
     }
 }
 
@@ -145,13 +145,13 @@ void Service::handle_cli_connection() {
         return;
     }
 
-    std::cout << "CLI client connected" << std::endl;
+    helper::log_info("CLI client connected", quiet_mode);
 
     char buffer[256];
     ssize_t bytes_read = recv(client_fd, buffer, sizeof(buffer) - 1, 0);
     if (bytes_read > 0) {
         buffer[bytes_read] = '\0'; // Null-terminate the string
-        std::cout << "Received from CLI: " << buffer << std::endl;
+        helper::log_info("Received from CLI: " + std::string(buffer), quiet_mode);
         std::string command(buffer);
 
         if (command.find("PING") == 0) {
@@ -184,7 +184,7 @@ void Service::handle_cli_connection() {
     }
 
     close(client_fd);
-    std::cout << "CLI client disconnected" << std::endl;
+    helper::log_info("CLI client disconnected", quiet_mode);
 }
 
 int Service::start()
@@ -214,7 +214,7 @@ int Service::loop()
             FD_SET(neighbour_discovery->get_socket_fd(), &read_fds);
             max_fd = std::max(max_fd, neighbour_discovery->get_socket_fd());
         }
-        
+
         struct timeval timeout;
         timeout.tv_sec = 5; // Wait for 5 seconds
         timeout.tv_usec = 0;
@@ -222,7 +222,7 @@ int Service::loop()
         int activity = select(max_fd + 1, &read_fds, nullptr, nullptr, &timeout);
 
         if (activity < 0) {
-            perror("select failed");
+            helper::log_error("select failed", quiet_mode);
             return -1;
         }
 
@@ -230,10 +230,8 @@ int Service::loop()
         {
             handle_cli_connection();
         }
-
-        if (neighbour_discovery) {
+        if (activity > 0 && neighbour_discovery) {
             neighbour_discovery->handle_activity(read_fds);
-            
         }
 
         if (neighbour_discovery) {

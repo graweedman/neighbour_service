@@ -1,25 +1,9 @@
-#include <iostream>
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <unistd.h>
-#include <cstring>
-#include <sys/stat.h>
-#include <sys/wait.h>
-#include <signal.h>
-#include <string>
-
-#include "service_connection.h"
-
+#include "cli.h"
 
 using namespace std;
 
-const char* SERVICE_PID_PATH = "/tmp/graw_service.pid";
-const char* CLI_SOCKET_PATH = "/tmp/graw_service.sock";
-const char* SERVICE_BINARY = "./graw_service";
-
 ServiceConnection service_connection(CLI_SOCKET_PATH);
 
-pid_t service_pid = -1;
 
 pid_t read_pid_file() {
     FILE* pid_file = fopen(SERVICE_PID_PATH, "r");
@@ -44,31 +28,31 @@ bool is_service_running() {
 }
 
 int start_service() {
-    cout << "Starting service..." << endl;
+    helper::log_info("Starting service...", false);
 
     pid_t pid = fork();
     if (pid < 0) {
-        perror("fork failed");
+        helper::log_error("fork failed", false);
         return -1;
     } else if (pid == 0) {
         execl(SERVICE_BINARY, "graw_service", nullptr);
-        perror("execl failed");
+        helper::log_error("execl failed", false);
         exit(EXIT_FAILURE);
     }
 
-    cout << "Service started with PID: " << pid << endl;
+    helper::log_info("Service started with PID: " + std::to_string(pid), false);
     sleep(2);
 
     for( int i = 0; i < 5; ++i) {
         if (is_service_running()) {
-            cout << "Service is ready." << endl;
+            helper::log_info("Service is ready.", false);
             return 0;
         }
-        cout << "Waiting for service to be ready..." << endl;
+        helper::log_info("Waiting for service to be ready...", false);
         usleep(500000);
     }
 
-    cout << "Service did not start in time." << endl;
+    helper::log_error("Service did not start in time.", false);
     return -1;
 }
 
@@ -80,25 +64,22 @@ void stop_service() {
     }
 
     if (pid > 0) {
-        cout << "Stopping service (POD: " << pid << ")..." << endl;
+        helper::log_info("Stopping service (PID: " + std::to_string(pid) + ")", false);
         if (kill(pid, SIGTERM) == 0) {
             int status;
             if (waitpid(pid, &status, WNOHANG) >= 0) {
-                cout << "Service stopped" << endl;
+                helper::log_info("Service stopped", false);
             }
             service_pid = -1;
             unlink(SERVICE_PID_PATH);
         }
     } else {
-        cout << "No running service found." << endl;
+        helper::log_info("No running service found.", false);
     }
 }
 
-
-
-
 int main() {
-    cout << "Connecting to neighbor discovery service..." << endl;
+    helper::log_info("Connecting to neighbor discovery service...", false);
 
     while (true) {
         cout << "> ";
@@ -109,9 +90,21 @@ int main() {
             break;
         }
 
+        if (input == "help") {
+            cout << "Available commands:" << endl;
+            cout << "start - Start the neighbor discovery service" << endl;
+            cout << "stop - Stop the neighbor discovery service" << endl;
+            cout << "status - Check the status of the neighbor discovery service" << endl;
+            cout << "help - Show this help message" << endl;
+            cout << "LIST - List all discovered neighbors from service" << endl;
+            cout << "PING - Send a PING request to the service" << endl;
+            cout << "quit - Exit the CLI" << endl;
+            continue;
+        }
+
         if (input == "start") {
             if (is_service_running() && service_connection.can_connect()) {
-                cout << "Service is already running" << endl;
+                helper::log_info("Service is already running", false);
             } else {
                 start_service();
             }
@@ -119,21 +112,21 @@ int main() {
         }
 
         if (input == "stop") {
-            cout << "Stopping service..." << endl;
+            helper::log_info("Stopping service...", false);
             stop_service();
             continue;
         }
 
         if (input == "status") {
             if (is_service_running()) {
-                cout << "Service is running" << endl;
+                helper::log_info("Service is running", false);
             } else {
-                cout << "Service is not running" << endl;
+                helper::log_info("Service is not running", false);
             }
             if (service_connection.can_connect()) {
-                cout << "Can connect to service." << endl;
+                helper::log_info("Can connect to service.", false);
             } else {
-                cout << "Can not connect to service." << endl;
+                helper::log_info("Cannot connect to service.", false);
             }
             continue;
         }
@@ -143,13 +136,13 @@ int main() {
         }
         string response;
         if (service_connection.send_and_receive(input, response)) {
-            cout << "Response: " << response << endl;
+            cout << "Response: " + response << endl;
         } else {
-            cout << "Failed to send command or receive response." << endl;
+            helper::log_error("Failed to send command or receive response.", false);
         }
     }
     stop_service();
-    cout << "Disconnected from service." << endl;
+    helper::log_info("Disconnected from service.", false);
 
     return 0;
 }

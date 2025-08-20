@@ -62,7 +62,6 @@ NodeID generate_node_id()
 {
     NodeID id{};
     const char* home = getenv("HOME");
-    std::cout << "Home directory: " << (home ? home : "not found") << std::endl;
     if (!home) return id;
 
     char dirpath[1024];
@@ -76,7 +75,6 @@ NodeID generate_node_id()
 
     uint8_t tmp[16];
     if (!gen_random_16(tmp)) {
-        std::cout << "Failed to generate random UUID" << std::endl;
         return id;
     }
     set_uuid_v4_bits(tmp);

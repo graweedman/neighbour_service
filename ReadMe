@@ -1,0 +1,10 @@
+QUICK GUIDE:
+
+* Put both executables in the same folder and launch graw_cli.
+* TO start a service type 'start'.
+* IT will detect neihbours in background.
+* IF there are visible neighbours, type 'LIST' to see the list of the neighbours.
+
+BUILD:
+* JUST type 'make' in the project directory. 
+** Need atleast std=c++17+

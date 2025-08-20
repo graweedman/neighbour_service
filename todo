@@ -17,63 +17,66 @@
 - [x] Set up UNIX domain socket (or localhost TCP) for CLI communication
 
 ### 📡 Peer Discovery
-- [ ] Periodically (e.g. every 5 seconds) broadcast "hello" messages on all interfaces
-- [ ] Listen for replies from other services
-- [ ] Parse messages to identify neighbors
-- [ ] Match replies by subnet to confirm they are neighbors
+- [x] Periodically (e.g. every 5 seconds) broadcast "hello" messages on all interfaces
+- [x] Listen for replies from other services
+- [x] Parse messages to identify neighbors
+- [x] Match replies by subnet to confirm they are neighbors
 
 ### 🕒 Neighbor Tracking
-- [ ] Store a list of active neighbors (IP + MAC + last_seen timestamp)
-- [ ] Expire any neighbors not seen in the last 30 seconds
+- [x] Store a list of active neighbors (IP + MAC + last_seen timestamp)
+- [x] Expire any neighbors not seen in the last 30 seconds
 
 ### 📞 CLI Communication
 - [x] Accept connections from CLI tool
-- [ ] On request, return list of current neighbors in plain text:
-  - Format: `IP MAC\n` per neighbor
+- [x] On request, return list of current neighbors in plain text:
   - Use non-blocking I/O or select() (no threads allowed)
 
 ## 🖥️ CLI Program
 - [x] Connect to local service (UNIX or TCP socket)
-- [ ] Send command: e.g., "LIST\n"
-- [ ] Receive neighbor list
-- [ ] Print formatted output to terminal:
+- [x] Send command: e.g., "LIST\n"
+- [x] Receive neighbor list
+- [x] Print formatted output to terminal:
   ```
-  Active Neighbors:
-  -----------------
-  IP Address        MAC Address
-  192.168.1.10      aa:bb:cc:dd:ee:ff
+    Neighbors:
+  2dbe0f0789384b48822e2bfe524db290 - Connections:
+  - 192.168.100.191 (52:54:0:33:47:db)
+  Interfaces:
+  - virbr100
+
+  1d1febfabcc049419cd66b5306aa19a3 - Connections:
+  - 192.168.122.168 (52:54:0:f0:ce:73)
+  - 192.168.100.192 (52:54:0:ee:d6:9f)
+  Interfaces:
+  - virbr0
+  - virbr100
   ...
   ```
 
 ## 💡 Protocol Design (Internal)
-- [ ] Define a simple message protocol for discovery:
-  - Example hello packet: `"HELLO <IP> <MAC>"`
-  - Reply packet: `"REPLY <IP> <MAC>"`
-- [ ] Define CLI-to-service protocol:
+- [x] Define a simple message protocol for discovery:
+  - Example hello packet: `"HELLO <NodeID> <IP> <MAC> "`
+- [x] Define CLI-to-service protocol:
   - CLI sends: `"LIST\n"`
   - Service replies with lines: `<IP> <MAC>\n`
 
 ## 🧪 Testing & Debugging
 
 ### Local Testing
-- [ ] Create 3+ VMs in virt-manager with shared virtual network
-- [ ] One VM should have 2 network interfaces
-- [ ] Run service on all VMs
-- [ ] Use CLI tool to verify that neighbors are detected and listed correctly
+- [x] Create 3+ VMs in virt-manager with shared virtual network
+- [x] One VM should have 2 network interfaces
+- [x] Run service on all VMs
+- [x] Use CLI tool to verify that neighbors are detected and listed correctly
 
 ### Edge Cases
-- [ ] Changing IP address while service is running
-- [ ] Device connecting/disconnecting from network
-- [ ] Service restarting
+- [x] Changing IP address while service is running
+- [x] Device connecting/disconnecting from network
+- [x] Service restarting
 
 ## 🧼 Finishing Touches
-- [ ] Add usage instructions (e.g., --help for CLI)
-- [ ] Add debug/logging output (optional, maybe controllable via flag)
-- [ ] Ensure compliance:
-  - [ ] No threads
-  - [ ] No exceptions
-  - [ ] No system programs/tools
-  - [ ] g++, stdc++ only
-
-## 📋 Current Status
-**Next Priority**: Implement UDP discovery protocol for broadcasting and listening
+- [x] Add usage instructions (e.g., --help for CLI)
+- [x] Add debug/logging output (optional, maybe controllable via flag)
+- [x] Ensure compliance:
+  - [x] No threads
+  - [x] No exceptions
+  - [x] No system programs/tools
+  - [x] g++, stdc++ only

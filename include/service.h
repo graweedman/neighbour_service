@@ -15,12 +15,14 @@
 #include "neighbour_discovery.h"
 #include "common/types.h"
 #include "common/node_id.h"
+#include "common/helper.h"
 
 class Service {
     NodeID node_id;
     const char* cli_socket_path;
     int cli_socket_fd;
     int discovery_port;
+    bool quiet_mode;
     bool running = false;
 
     std::unique_ptr<NeighbourDiscovery> neighbour_discovery;
@@ -33,7 +35,7 @@ class Service {
     void cleanup_cli_socket();
     void handle_cli_connection();
 public:
-    Service(const char* cli_socket_path, int discovery_port);
+    Service(const char* cli_socket_path, int discovery_port, bool quiet_mode);
     ~Service();
 
     int start();

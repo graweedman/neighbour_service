@@ -9,6 +9,7 @@
 #include <netinet/ether.h>
 #include <unistd.h>
 #include <cstring>
+#include <iostream>
 
 #include "types.h"
 
@@ -19,8 +20,8 @@ std::string network_cidr(const std::string& ip, int cidr);
 IP_Address broadcast_address(const std::string& network_cidr);
 MAC_Address get_mac_address(const std::string& interface_name);
 bool is_ip_in_network(const std::string& ip, const std::string& network_cidr);
-
-// std::vector<NetworkInterface> get_network_interfaces();
+void log_error(const std::string& message, bool quiet_mode);
+void log_info(const std::string& message, bool quiet_mode);
 
 } // namespace helper
 
